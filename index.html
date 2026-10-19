@@ -2371,12 +2371,14 @@ var qrcode = function() {
 
 <script>
 /* ====== AJUSTE AQUI ====== */
-   const GITHUB_USUARIO = 'edson-fiusa  ';
-   const GITHUB_REPO    = 'minutocerto-download';
-   const APK_NOME       = 'minuto-certo.apk';
+const GITHUB_USUARIO = 'edson-fiusa';
+const GITHUB_REPO    = 'minutocerto-download';
+const APK_NOME       = 'minuto-certo.apk';     // nome do arquivo anexado na Release
 /* ========================= */
 
 const REPO_URL = `https://github.com/${GITHUB_USUARIO}/${GITHUB_REPO}`;
+// Endereço desta página (é ele que o QR Code carrega, mesmo se o arquivo for aberto localmente)
+const PAGINA_URL = `https://${GITHUB_USUARIO}.github.io/${GITHUB_REPO}/`;
 // Link fixo: sempre baixa o APK da Release mais recente
 const APK_URL = `${REPO_URL}/releases/latest/download/${APK_NOME}`;
 
@@ -2386,11 +2388,21 @@ $('baixar').href = APK_URL;
 // aviso para iPhone/iPad
 if (/iphone|ipad|ipod/i.test(navigator.userAgent)) $('aviso-ios').style.display = 'block';
 
-// mostra a versão da Release mais recente (se não conseguir, apenas não mostra)
-fetch(`https://api.github.com/repos/${GITHUB_USUARIO}/${GITHUB_REPO}/releases/latest`)
+// Procura o APK de verdade nas Releases (aceita qualquer nome de arquivo .apk) e mostra a versão.
+// Se a consulta falhar, continua valendo o link fixo acima.
+fetch(`https://api.github.com/repos/${GITHUB_USUARIO}/${GITHUB_REPO}/releases?per_page=10`)
   .then((r) => (r.ok ? r.json() : null))
-  .then((rel) => {
-    if (!rel) return;
+  .then((lista) => {
+    if (!Array.isArray(lista)) return;
+    const rel = lista.find((x) => !x.draft && (x.assets || []).some((a) => /\.apk$/i.test(a.name)));
+    if (!rel) {
+      $('versao').textContent = lista.length
+        ? 'A Release publicada não tem um arquivo .apk anexado.'
+        : 'Nenhuma Release publicada ainda.';
+      return;
+    }
+    const apk = rel.assets.find((a) => /\.apk$/i.test(a.name));
+    $('baixar').href = apk.browser_download_url;
     const data = rel.published_at ? new Date(rel.published_at).toLocaleDateString('pt-BR') : '';
     $('versao').textContent = 'Versão ' + (rel.tag_name || '') + (data ? ' · ' + data : '');
   })
@@ -2416,8 +2428,7 @@ function desenharQR(canvas, texto) {
     }
   }
 }
-const paginaUrl = location.origin + location.pathname;
-desenharQR($('qr'), paginaUrl);
+desenharQR($('qr'), PAGINA_URL);
 
 $('baixar-qr').addEventListener('click', () => {
   const a = document.createElement('a');
